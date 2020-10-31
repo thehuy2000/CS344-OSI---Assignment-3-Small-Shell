@@ -10,6 +10,7 @@ File: main.c
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <sys/types.h>
 
 int MAX_CHAR = 2048;
 int MAX_CMD = 512;
@@ -48,7 +49,7 @@ char* getCommandLine() {
 
 	// Setting the cmdLine to NULL and ensures it hold the correct ammount of chars
 	cmdLine = calloc(MAX_CHAR + 1, sizeof(char));
-	printf("\n: ");
+	printf(": ");
 	fflush(stdout);
 
 	// Gets the current Command Line
@@ -75,17 +76,16 @@ void processCommandLine() {
 
 	// Goes through the script untill the exit command shows up
 	while (strcmp(currCmdLine, "exit") - NEW_LINE_CHAR_VALUE != 0) {
+		// --------------------- Fills out struct -----------------------------
+
 		// Copys the current command line into currCmdLine and fills out struct
 		strcpy(currCmdLine, getCommandLine());
 
-		// Gets the length of the full command line
-		cmdLineLength = strlen(currCmdLine);
-
-		// Fills in the command line
+		// The full command line goes into currCommand->commandLine
 		currCommand->commandLine = currCmdLine;
 
-		printf("The cmdLine is: %s", currCommand->commandLine);
-		fflush(stdout);
+		// Gets the length of the full command line
+		cmdLineLength = strlen(currCmdLine);
 
 		// This makes a temporary command line
 		strcpy(temp, currCmdLine);
@@ -94,21 +94,17 @@ void processCommandLine() {
 		char* token = strtok(temp, " ");
 		currCommand->command = token;
 
-		printf("The command is: %s", currCommand->command);
-		fflush(stdout);
-
 		// Places the rest of the line in the parameters
 		commandLength = strlen(currCommand->command) + 1;
 
 		// If they are equal that means there is no parameters so skip this section
 		if (cmdLineLength == commandLength - 1)
-			currCommand->parameters = NULL;
+			currCommand->parameters = "\0";
 		else {
+			// We make token the command line then we delete the command from it
 			token = currCmdLine;
 			memmove(token, token + commandLength, strlen(token));
 			currCommand->parameters = token;
-			printf("\nThe parameters are: %s\n", currCommand->parameters);
-			fflush(stdout);
 		}
 
 		// Searches at the last value for an &
@@ -118,8 +114,26 @@ void processCommandLine() {
 		else
 			currCommand->backgroundValue = 0;
 
-		printf("\nThe background value is: %d\n\n", currCommand->backgroundValue);
-		fflush(stdout);
+		// --------------------------------------------------------------------
+		// -------------------- Executes Built-In command ---------------------
+		// Echo Command
+		if (strcmp(currCommand->command, "echo") == 0) {
+			// If there are no parameters then echo "\n"
+			if (strcmp(currCommand->command, "\0") == 0) {
+				char* newargv[] = { "/bin/echo", "\n", NULL };
+				execv(newargv[0], newargv);
+			}
+			// If there are parameters then echo currCommand->parameters
+			else {
+				char* newargv[] = { "/bin/echo", currCommand->parameters, NULL };
+				execv(newargv[0], newargv);
+			}
+		}
+		else {
+			char* newargv[] = { "/bin/echo", "THIS ISNT ECHO", NULL };
+			execv(newargv[0], newargv);
+		}
+		// --------------------------------------------------------------------
 
 	}
 }
