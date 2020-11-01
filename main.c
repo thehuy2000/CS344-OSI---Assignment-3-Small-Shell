@@ -11,6 +11,8 @@ File: main.c
 #include <string.h>
 #include <unistd.h>
 #include <sys/types.h>
+#include <fcntl.h>
+#include <sys/stat.h>
 
 int MAX_CHAR = 2048;
 int MAX_CMD = 512;
@@ -69,72 +71,188 @@ void processCommandLine() {
 	// Initialize Value
 	struct command* currCommand = malloc(sizeof(struct command));
 	char* currCmdLine = calloc(MAX_CHAR + 1, sizeof(char));
+	char* tempCmdLine = calloc(MAX_CHAR + 1, sizeof(char));
 	char* temp = calloc(MAX_CHAR + 1, sizeof(char));
 	int parameterLength = 0;
 	int commandLength = 0;
 	int cmdLineLength = 0;
 
-	// Goes through the script untill the exit command shows up
-	while (strcmp(currCmdLine, "exit") - NEW_LINE_CHAR_VALUE != 0) {
-		// --------------------- Fills out struct -----------------------------
+	pid_t spawnpid;
+	int childExitMethod = -5;
 
+	// --------------------- Fills out struct -----------------------------
+	while (strcmp(currCmdLine, "exit") - NEW_LINE_CHAR_VALUE != 0) {
 		// Copys the current command line into currCmdLine and fills out struct
 		strcpy(currCmdLine, getCommandLine());
 
-		// The full command line goes into currCommand->commandLine
+		// COMMAND LINE
 		currCommand->commandLine = currCmdLine;
+		strcpy(tempCmdLine, currCmdLine);
 
-		// Gets the length of the full command line
-		cmdLineLength = strlen(currCmdLine);
-
-		// This makes a temporary command line
-		strcpy(temp, currCmdLine);
-
-		// Finds the command by tokenizing until ' '
-		char* token = strtok(temp, " ");
-		currCommand->command = token;
-
-		// Places the rest of the line in the parameters
-		commandLength = strlen(currCommand->command) + 1;
-
-		// If they are equal that means there is no parameters so skip this section
-		if (cmdLineLength == commandLength - 1)
-			currCommand->parameters = "\0";
+		// Checks to see if the command was starting with '#' if so apply ignore command else continue normally
+		if (currCommand->commandLine[0] == '#') {
+			currCommand->command = "ignore";
+		}
 		else {
+			// Gets the length of the full command line
+			cmdLineLength = strlen(currCmdLine);
+
+			// This makes a temporary command line
+			strcpy(temp, currCmdLine);
+
+			// Finds the command by tokenizing until ' '
+			// COMMAND
+			char* token = strtok(temp, " ");
+			currCommand->command = calloc(strlen(token) + 1, sizeof(char));
+			strcpy(currCommand->command, token);
+
+			// Places the rest of the line in the parameters
+			commandLength = strlen(currCommand->command) + 1;
+
+			// If they are equal that means there is no parameters so change name of command to echo and have parameter of "\n"
+			if (token[commandLength - 2] == '\n') {
+				if (token[0] == 'e') {
+					currCommand->command = "echo";
+					currCommand->parameters = "\n";
+				}
+				if (token[0] == 'l') {
+					currCommand->command = "ls";
+					currCommand->parameters = "\0";
+				}
+			}
+
 			// We make token the command line then we delete the command from it
-			token = currCmdLine;
-			memmove(token, token + commandLength, strlen(token));
-			currCommand->parameters = token;
-		}
-
-		// Searches at the last value for an &
-		parameterLength = strlen(token);
-		if (token[parameterLength - 2] == '&')
-			currCommand->backgroundValue = 1;
-		else
-			currCommand->backgroundValue = 0;
-
-		// --------------------------------------------------------------------
-		// -------------------- Executes Built-In command ---------------------
-		// Echo Command
-		if (strcmp(currCommand->command, "echo") == 0) {
-			// If there are no parameters then echo "\n"
-			if (strcmp(currCommand->command, "\0") == 0) {
-				char* newargv[] = { "/bin/echo", "\n", NULL };
-				execv(newargv[0], newargv);
-			}
-			// If there are parameters then echo currCommand->parameters
 			else {
-				char* newargv[] = { "/bin/echo", currCommand->parameters, NULL };
-				execv(newargv[0], newargv);
+				strcpy(token, tempCmdLine);
+				memmove(token, token + commandLength, strlen(token));
+				currCommand->parameters = token;
+			}
+
+			// Searches at the last value for an &
+			parameterLength = strlen(token);
+			if (token[parameterLength - 2] == '&')
+				currCommand->backgroundValue = 1;
+			else
+				currCommand->backgroundValue = 0;
+		}
+		// --------------------------------------------------------------------
+
+		// -------------------- Executes Built-In commands --------------------
+
+		// Echo Command -------------------------
+		if (strcmp(currCommand->command, "echo") == 0) {
+			printf("%s", currCommand->parameters);
+			fflush(stdout);
+			//char* newargv[] = { "/bin/echo", currCommand->parameters, NULL };
+			//execv(newargv[0], newargv);
+		}
+
+		// Ignore Command -----------------------
+		else if (strcmp(currCommand->command, "ignore") == 0) {
+			// Do nothing and ignore the line
+		}
+
+		// Ls Command ---------------------------
+		else if (strcmp(currCommand->command, "ls") == 0) {
+			// If the command line is just ls then run ls
+			if (strcmp(currCommand->parameters, "\0") == 0) {
+				//char* newargv[] = { "/bin/ls", NULL };
+				//execv(newargv[0], newargv);
+			}
+			// If there is more to the command line that means theres output files invloved
+			else {
+				// Parse the parameters so just the output file is left then store that in currCommand->outputFile
+				temp = currCommand->parameters;
+				char* token2 = strtok(temp, "\n");
+				memmove(token2, token2 + 2, strlen(token2));
+				currCommand->outputFile = token2;
+
+				// Outsource the next data into currCommand->outputFile
+				//int out = open(currCommand->outputFile, O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IRGRP | S_IWGRP | S_IWUSR);
+				//dup2(out, 1); // http://www.cs.loyola.edu/~jglenn/702/S2005/Examples/dup2.html
+
+				// Writing the information to be outsourced
+				//char* newargv[] = { "/bin/ls", NULL };
+				//execvp(newargv[0], newargv);
 			}
 		}
+		// PWD Command --------------------------
+		else if (strcmp(currCommand->command, "pwd") == 0) {
+			// Create a buffer and the current working directory
+			char* buffer;
+			char* workingPath = getcwd(buffer, MAX_CHAR);
+
+			// Print it out
+			printf("%s\n", workingPath);
+			fflush(stdout);
+		}
+		// Cat Command --------------------------
+		else if (strcmp(currCommand->command, "cat") == 0) {
+			// Find the file name of whats going to be cated
+			temp = currCommand->parameters;
+			char* token2 = strtok(temp, "\n");
+
+			//char* newargv[] = { "/bin/cat", token2, NULL };
+			//execvp(newargv[0], newargv);
+		}
+		// Wc Command =--------------------------
+		else if (strcmp(currCommand->command, "wc") == 0) {
+			// Checks to see if the parameters have both '<' and '>'
+			if (strchr(currCommand->parameters, '<') != NULL && strchr(currCommand->parameters, '>') != NULL) {
+				// Parse the paramters to find the file name and store in currCommand->inputFile and currCommand->outputFile
+				temp = currCommand->parameters;
+				char* token2 = strtok(temp, "\n");
+				char* token3 = calloc(strlen(token2) + 1, sizeof(char));
+				strcpy(token3, token2);
+
+				// Input file name stored in currCommand->inputFile
+				memmove(token2, token2 + 2, strlen(token2));
+				token2 = strtok(temp, " ");
+				currCommand->inputFile = calloc(strlen(token2) + 1, sizeof(char));
+				strcpy(currCommand->inputFile, token2);
+
+				int inputLength = strlen(currCommand->inputFile);
+
+				// Output file name stored in currCommand->outputFile
+				memmove(token3, token3 + inputLength + 5, strlen(token3));
+				currCommand->outputFile = calloc(strlen(token3) + 1, sizeof(char));
+				strcpy(currCommand->outputFile, token3);
+
+				// Opens input and output files
+				//int in = open(currCommand->inputFile, O_RDONLY);
+				//int out = open(currCommand->outputFile, O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IRGRP | S_IWGRP | S_IWUSR);
+
+				//dup2(in, 0);
+				//dup2(out, 1);
+
+				//char* newargv[] = { "wc", currCommand->inputFile, NULL };
+				//execvp(newargv[0], newargv);
+
+			}
+			// Checks to see if the parameter has only the '<' and not '>'
+			else if (strchr(currCommand->parameters, '<') != NULL) {
+				// Parse the paramters to find the file name and store in currCommand->inputFile
+				temp = currCommand->parameters;
+				char* token2 = strtok(temp, "\n");
+				memmove(token2, token2 + 2, strlen(token2));
+				currCommand->inputFile = token2;
+
+				// Create input
+				//int in = open(currCommand->inputFile, O_RDONLY);
+				//dup2(in, 0);
+
+				//char* newargv[] = { "/bin/wc", currCommand->inputFile, NULL };
+				//execvp(newargv[0], newargv);
+			}
+
+		}
+
+
 		else {
-			char* newargv[] = { "/bin/echo", "THIS ISNT ECHO", NULL };
+			char* newargv[] = { "/bin/echo", "THIS ISNT ECHO OR IGNORE", NULL };
 			execv(newargv[0], newargv);
 		}
 		// --------------------------------------------------------------------
-
 	}
 }
 // ================================================================================================
@@ -142,6 +260,5 @@ void processCommandLine() {
 // ================================================================================================
 int main() {
 	processCommandLine();
-
 	return EXIT_SUCCESS;
 }
