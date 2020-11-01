@@ -77,11 +77,17 @@ void processCommandLine() {
 	int commandLength = 0;
 	int cmdLineLength = 0;
 
+	pid_t smallshPID = getppid();
 	pid_t spawnpid;
 	int childExitMethod = -5;
 
 	// --------------------- Fills out struct -----------------------------
 	while (strcmp(currCmdLine, "exit") - NEW_LINE_CHAR_VALUE != 0) {
+
+		// PARENT: runs thorough the filling out the struct then forks afterwards 
+		// to have the child exec while waithing for the child to finsh when it does 
+		// go through the the filling out again until exit is found as the cmdline
+
 		// Copys the current command line into currCmdLine and fills out struct
 		strcpy(currCmdLine, getCommandLine());
 
@@ -134,8 +140,26 @@ void processCommandLine() {
 				currCommand->backgroundValue = 1;
 			else
 				currCommand->backgroundValue = 0;
+
+			// Checks for the '$$' to change it into the PID
+			if (strstr(currCommand->parameters, "$$") != NULL) {
+				// PID of the smallsh into a char and storing it int cpid
+				char * charPID = calloc(MAX_CHAR + 1, sizeof(char));
+				sprintf(charPID, "%d", smallshPID);
+
+				// Tokenizing the first part the parameters then cating the pid to the token
+				char* moneyToken = strtok(currCommand->parameters, "$$");
+				strcat(moneyToken, charPID);
+
+				// Making the currCommand->parameters = to the parameters with $$ replaced by the PID of smallsh
+				strcpy(currCommand->parameters, moneyToken);
+			}
 		}
 		// --------------------------------------------------------------------
+
+		// CHILD: This is where the fork would happen the child would take the data 
+		// from the parent and exec while the parent waits for the exec then repeats
+		// with new information for the next child
 
 		// -------------------- Executes Built-In commands --------------------
 
@@ -177,10 +201,11 @@ void processCommandLine() {
 			}
 		}
 		// PWD Command --------------------------
-		else if (strcmp(currCommand->command, "pwd") == 0) {
+		else if (strcmp(currCommand->command, "pwd\n") == 0) {
 			// Create a buffer and the current working directory
-			char* buffer;
-			char* workingPath = getcwd(buffer, MAX_CHAR);
+			char* buffer2 = calloc(MAX_CHAR + 1, sizeof(char));
+			char* workingPath = calloc(MAX_CHAR + 1, sizeof(char)); 
+			strcpy(workingPath, getcwd(buffer2, MAX_CHAR));
 
 			// Print it out
 			printf("%s\n", workingPath);
@@ -246,9 +271,74 @@ void processCommandLine() {
 			}
 
 		}
+		// Test Command -------------------------
+		else if (strcmp(currCommand->command, "test") == 0) {
+			printf("testing....\n");
+			fflush(stdout);
+		}
+		// Status Command -----------------------
+		else if (strcmp(currCommand->command, "status") == 0) {
+			printf("PAR |%s|\n", currCommand->parameters);
+			fflush(stdout);
+
+			char* newargv[] = { "/bin/status", currCommand->parameters, NULL };
+			execvp(newargv[0], newargv);
+		}
+
+		else if (strcmp(currCommand->command, "badfile\n") == 0) {
+			printf("nonononononononononno\n");
+			fflush(stdout);
+		}
+		// Sleep command
+		else if (strcmp(currCommand->command, "sleep") == 0) {
+			// Gets rid of the new line character in the parameters so it can execute
+			strtok(currCommand->parameters, "\n");
+			if (currCommand->backgroundValue = 1) {
+				strtok(currCommand->parameters, " ");
+				//char* newargv[] = { "/bin/sleep", currCommand->parameters, NULL };
+				//execvp(newargv[0], newargv);
+			}
+			else {
+				//char* newargv[] = { "/bin/sleep", currCommand->parameters, NULL };
+				//execvp(newargv[0], newargv);
+			}
+		}
+		else if (strcmp(currCommand->command, "pkill") == 0) {
+			printf("we kilin\n");
+			fflush(stdout);
+		}
+		// Cd Command to go to home dir ---------
+		else if (strcmp(currCommand->command, "cd\n") == 0) {
+			printf("back to home directory\n");
+			fflush(stdout);
+
+			//char* newargv[] = { "/bin/cd", NULL };
+			//execvp(newargv[0], newargv);
+		}
+		// Cd command to go to specifc dir ------
+		else if (strcmp(currCommand->command, "cd") == 0) {
+			printf("we cding umm...|%s|", currCommand->parameters);
+			fflush(stdout);
+
+			//char* newargv[] = { "/bin/cd", currCommand->parameters, NULL };
+			//execvp(newargv[0], newargv);
+		}
+		// Mkdir Command ------------------------
+		else if (strcmp(currCommand->command, "mkdir") == 0) {
+			printf("making the dir duh\n");
+			fflush(stdout);
+
+			mkdir(currCommand->parameters, 0777);
+		}
+
+
 
 
 		else {
+			printf("CURR CMD |%s|\n", currCommand->command);
+			fflush(stdout);
+			printf("CURR PAR |%s|\n", currCommand->parameters);
+			fflush(stdout);
 			char* newargv[] = { "/bin/echo", "THIS ISNT ECHO OR IGNORE", NULL };
 			execv(newargv[0], newargv);
 		}
