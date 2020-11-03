@@ -8,6 +8,7 @@ File: main.c
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <signal.h>
 #include <string.h>
 #include <unistd.h>
 #include <sys/types.h>
@@ -15,19 +16,20 @@ File: main.c
 #include <sys/stat.h>
 #include <sys/wait.h>
 
-int MAX_CHAR = 2048;
-int MAX_CMD = 512;
-int NEW_LINE_CHAR_VALUE = 10;
+int MAX_CHAR = 2048; // Max number of chars in a command line
+int MAX_CMD = 512; // Max number of commands 
+int NEW_LINE_CHAR_VALUE = 10; // "\n" ASCII Value
+int CATCH_VAR = 0; // For catching SIGTSTP
 
 // ================================================================================================
 /*
 Struct: command
 char * commandline      The users entire command command line
 char * command          The users command
-char * parameters		An array of the parameters
+char * parameters		A string of the parameters
 char * inputFile
 char * outputFile
-int backgroundValue          The value is to check if '&' is in the command if so run in the background (1 = TRUE / 0 = FALSE)
+int backgroundValue     The value is to check if '&' is in the command if so run in the background (1 = TRUE / 0 = FALSE)
 */
 struct command {
 	char* commandLine;
@@ -37,6 +39,17 @@ struct command {
 	char* outputFile;
 	int backgroundValue;
 };
+
+// Headers ========================================================================================
+char* getCommandLine();
+struct command* fillCommand(pid_t smallshPID);
+void processCommandLine(struct command* currCommand, int smallshPID, int killCount);
+void sigtstpHandler(int signal);
+void cdCommand(struct command* currCommand);
+void statusCommand(int stat);
+void exitCommand();
+// ================================================================================================
+
 // ================================================================================================
 /*
 char * getCommandLine
@@ -63,10 +76,11 @@ char* getCommandLine() {
 }
 // ================================================================================================
 /*
-struct command * fillCommand()
----
-Parameters: ---
-Returns: ---
+struct command * fillCommand
+Fills a command struct with the information given from the current command line then returns the
+struct so that it can be used to process the command line
+Parameters: pid_t smallshPID
+Returns: currCommand
 */
 struct command* fillCommand(pid_t smallshPID) {
 	// Initialize command struct
@@ -166,17 +180,17 @@ struct command* fillCommand(pid_t smallshPID) {
 		}
 
 	}
-
 	return currCommand;
 }
 // ================================================================================================
 /*
 void processCommandLine
----
-Parameters: ---
+Takes the current command struct and processes it corresponding to whats been filled in the 
+fillCommand function
+Parameters: struct command* currCommand, int smallshPID, int killCount
 Returns: ---
 */
-void processCommandLine(struct command* currCommand, int smallshPID) {
+void processCommandLine(struct command* currCommand, int smallshPID, int killCount) {
 	// Initialize a temp char 
 	char* temp = calloc(MAX_CHAR + 1, sizeof(char));
 	pid_t spawnpidsleep = -5;
@@ -232,20 +246,23 @@ void processCommandLine(struct command* currCommand, int smallshPID) {
 		char* workingPath = calloc(MAX_CHAR + 1, sizeof(char));
 		strcpy(workingPath, getcwd(buffer2, MAX_CHAR));
 
-		// Print it out
-		printf("%s", workingPath);
+		// Print the current working directory out
+		printf("%s\n", workingPath);
 		fflush(stdout);
 		exit(0);
 	}
+
 	// Cat Command --------------------------------------------------------------------------------
 	else if (strcmp(currCommand->command, "cat") == 0) {
 		// Find the file name of whats going to be cated
 		temp = currCommand->parameters;
 		char* token2 = strtok(temp, "\n");
 
+		// Execute the cat command
 		char* newargv[] = { "/bin/cat", token2, NULL };
 		execvp(newargv[0], newargv);
 	}
+
 	// Wc Command =--------------------------------------------------------------------------------
 	else if (strcmp(currCommand->command, "wc") == 0) {
 		// Checks to see if the parameters have both '<' and '>'
@@ -297,49 +314,79 @@ void processCommandLine(struct command* currCommand, int smallshPID) {
 		}
 		exit(0);
 	}
+
 	// Test Command -------------------------------------------------------------------------------
 	else if (strcmp(currCommand->command, "test") == 0) {
-		char* newargv[] = { "/bin/test", currCommand->parameters, NULL };
+		// Tokenizing to the type of test to make (in this assignment its '-f') 
+		char* testToken = strtok(currCommand->parameters, " ");
+		strcpy(currCommand->parameters, testToken);
+
+		// Executes the test command ( | /bin/test -f badfile | this returns a fail so exit value should be 1)
+		char* newargv[] = { "/bin/test", currCommand->parameters, "badfile", NULL };
 		execvp(newargv[0], newargv);
-	}
-	// Status Command -----------------------------------------------------------------------------
-	else if (strcmp(currCommand->command, "status") == 0) {
 
 	}
+
+	// Status Command -----------------------------------------------------------------------------
+	else if (strcmp(currCommand->command, "status") == 0) {
+		// Done in statusCommand
+	}
+
 	// Bad file
 	else if (strcmp(currCommand->command, "badfile\n") == 0) {
+		// Tries to open badfile, this file should not exist so it should return an error 
 		FILE* file;
 		file = fopen(currCommand->command, "r");
 		if (file == NULL)
-			fprintf(stderr, "file could not be read for input\n");
+			perror("badfile: ");
 	}
+
 	// Sleep command ------------------------------------------------------------------------------
 	else if (strcmp(currCommand->command, "sleep") == 0) {
-		// Gets rid of the new line character in the parameters so it can execute
-		strtok(currCommand->parameters, "\n");
-
-		if (currCommand->backgroundValue == 1) {
+		// Checks to see if the foreground-only mode is in effect
+		if (killCount == 1) {
 			strtok(currCommand->parameters, " ");
 
-			pid_t ogPID;
-			ogPID = getpid();
+			char* newargv[] = { "/bin/sleep", currCommand->parameters, NULL };
+			execvp(newargv[0], newargv);
+		}
+		// Foreground-only mode not on
+		else { 
+			// Gets rid of the new line character in the parameters so it can execute
+			strtok(currCommand->parameters, "\n");
+			// Checks to see if its a background command
+			if (currCommand->backgroundValue == 1) {
+				// Tokenize the currCommand->parameters so that it holds the number of seconds to sleep
+				strtok(currCommand->parameters, " ");
 
-			spawnpidsleep = fork();
-			pid_t bPID;
-			bPID = getpid();
-			if (bPID - ogPID == 1) {
-				printf("Background PID is |%d|\n", bPID);
-				fflush(stdout);
+				// Initializes forking values
+				pid_t ogPID;
+				ogPID = getpid();
+
+				// Forks and because its in the background it doesnt wait for it to end
+				spawnpidsleep = fork();
+				pid_t bPID;
+				bPID = getpid();
+				// This checks to see if its the child of the child
+				if (bPID - ogPID == 1) {
+					printf("Background PID is |%d|\n", bPID);
+					fflush(stdout);
+					char* newargv[] = { "/bin/sleep", currCommand->parameters, NULL };
+					execvp(newargv[0], newargv);
+				}
+
+			}
+			else {
+				// If foreground-only mode is not on and its not background conduct a normal sleep command
+				strtok(currCommand->parameters, "\n");
+
 				char* newargv[] = { "/bin/sleep", currCommand->parameters, NULL };
 				execvp(newargv[0], newargv);
 			}
 		}
-		else {
-			char* newargv[] = { "/bin/sleep", currCommand->parameters, NULL };
-			execvp(newargv[0], newargv);
-		}
 		exit(0);
 	}
+
 	// Pkill Command ------------------------------------------------------------------------------
 	else if (strcmp(currCommand->command, "pkill") == 0) {
 		char* pkillToken = strtok(currCommand->parameters, "\n");
@@ -349,45 +396,95 @@ void processCommandLine(struct command* currCommand, int smallshPID) {
 		char* newargv[] = { "/bin/pkill", currCommand->parameters, NULL };
 		execvp(newargv[0], newargv);
 	}
+
 	// Cd Command to go to home dir ---------------------------------------------------------------
 	else if (strcmp(currCommand->command, "cd\n") == 0) {
-		// Ignore done in main
+		// Ignore done in cdCommand
 	}
+
 	// Cd command to go to specifc dir ------------------------------------------------------------
 	else if (strcmp(currCommand->command, "cd") == 0) {
-		// Ignore done in main
+		// Ignore done in cdCommand
 	}
+
 	// Mkdir Command ------------------------------------------------------------------------------
 	else if (strcmp(currCommand->command, "mkdir") == 0) {
+		// Creates a directory with full mode
 		mkdir(currCommand->parameters, 0777);
 		printf("\n");
 		fflush(stdout);
 	}
+
 	// Date Command -------------------------------------------------------------------------------
 	else if (strcmp(currCommand->command, "date\n") == 0) {
+		// Showcases the current date
 		char* newargv[] = { "/bin/date", NULL };
 		execvp(newargv[0], newargv);
 	}
+
 	// Kill Command -------------------------------------------------------------------------------
 	else if (strcmp(currCommand->command, "kill") == 0) {
+		// Makes the smallshPID into a char *
 		char* PIDc = calloc(MAX_CHAR + 1, sizeof(char));
 		sprintf(PIDc, "%d", smallshPID);
 
-		printf("|%s|", PIDc);
-		fflush(stdout);
+		// This tokenizes so that the currCommand->parameter holds the type of signal to kill 
+		char* killToken = strtok(currCommand->parameters, " ");
+		currCommand->parameters = calloc(strlen(killToken) + 1, sizeof(char));
+		strcpy(currCommand->parameters, killToken);
+		memmove(currCommand->parameters, currCommand->parameters + 1, strlen(currCommand->parameters));
 
-		char* newargv[] = { "/bin/kill", currCommand->parameters, PIDc, NULL };
-		execvp(newargv[0], newargv);
+		// Checks to see if currCommand->parameters is "SIGTSTP"
+		if (strcmp(currCommand->parameters, "SIGTSTP") == 0) {
+			if (signal(SIGTSTP, sigtstpHandler) == SIG_ERR) {
+				printf("Signal handler failed\n");
+				fflush(stdout);
+				exit(1);
+			}
+
+			// If killCount is even that means that foregroung-only mode is off, so turn it on
+			if (killCount % 2 == 0)
+				CATCH_VAR = 1;
+
+			// Checks to see if entering or exiting foreground only mode
+			if (CATCH_VAR) {
+				printf("Entering foreground-only mode (& is now ignored)\n");
+				fflush(stdout);
+			}
+			else {
+				printf("Exiting foreground-only mode\n");
+				fflush(stdout);
+			}
+		}
 	}
 
 	// CATCH --------------------------------------------------------------------------------------
 	else {
+		/* This happens only if there is a command asked for that has not been implemented
+		 Also to catch any children that made it all the way down here to stop them in case of an 
+		error occuring
+		*/
 		printf("CURR CMD |%s|\n", currCommand->command);
 		fflush(stdout);
 		printf("CURR PAR |%s|\n", currCommand->parameters);
 		fflush(stdout);
-		char* newargv[] = { "/bin/echo", "THIS ISNT RIGHT", NULL };
+		char* newargv[] = { "/bin/echo", "This command has not been implemented", NULL };
 		execv(newargv[0], newargv);
+	}
+}
+// ================================================================================================
+/*
+void sigtstpHandler
+Takes the signal and changes the value of CATCH_VAR
+Parameters: int signal
+Returns: ---
+*/
+void sigtstpHandler(int signal) {
+	if (signal == SIGTSTP) {
+		if (CATCH_VAR)
+			CATCH_VAR = 0;
+		else
+			CATCH_VAR = 1;
 	}
 }
 // ================================================================================================
@@ -398,9 +495,23 @@ Parameters: ---
 Returns: ---
 */
 void exitCommand() {
-
 	printf("exit program\n\n");
 	fflush(stdout);
+}
+// ================================================================================================
+/*
+void statusCommand
+Returns the exit value of the previous signal through the parameter stat
+Parameters: int stat
+Returns: ---
+*/
+void statusCommand(int stat) {
+	// Checks to see if the last stat was succesful or not and prints out the value
+	if (WIFEXITED(stat))
+		stat = WEXITSTATUS(stat);
+	else
+		stat = WTERMSIG(stat);
+	printf("Exit value |%d|\n", stat);
 }
 // ================================================================================================
 /*
@@ -421,7 +532,7 @@ void cdCommand(struct command* currCommand) {
 			if (strcmp(currCommand->command, "cd\n") == 0)
 				chdir(getenv("HOME"));
 
-	// Changes to currDirr ++ currCommand->parameters
+	// Changes to currDirr ++ currCommand->parameters (Example: "./" ++ "testdir123456" )
 	if (strcmp(currCommand->command, "cd") == 0) {
 		strcat(currDIR, "/");
 		strcat(currDIR, currCommand->parameters);
@@ -432,7 +543,7 @@ void cdCommand(struct command* currCommand) {
 int main() {
 	// Initialize Values
 	struct command* currCommand = malloc(sizeof(struct command));
-	char* begin = "this Is The Begining no information yet";
+	char* begin = "Ive spent too long on this assignment";
 
 	// Setting the structs command line to something so it can ceck its not "exit\n"
 	currCommand->commandLine = calloc(strlen(begin) + 1, sizeof(char));
@@ -443,10 +554,13 @@ int main() {
 	char* smallshDIR = calloc(MAX_CHAR + 1, sizeof(char));
 	strcpy(smallshDIR, getcwd(buffer, MAX_CHAR));
 
+	// Initializes forking variables and other vriables
 	pid_t smallshPID = getppid();
 	pid_t spawnpid = -5;
 	int childStatus = 0;
 	int childPid = 0;
+	int stat = 0;
+	int killCount = 0; // If its 1 then we ignore "&" if its 0 we take "&" into account
 
 	while (strcmp(currCommand->commandLine, "exit") - NEW_LINE_CHAR_VALUE != 0) {
 		// Fill out the command struct with the correct values of the current line
@@ -454,6 +568,10 @@ int main() {
 
 		// Activates CD if needed
 		cdCommand(currCommand);
+
+		if (strcmp(currCommand->command, "status") == 0) {
+			statusCommand(childStatus);
+		}
 
 		// Fork - PARENT |Reads the current command| and CHILD |executes the command line|
 		spawnpid = fork();
@@ -463,18 +581,27 @@ int main() {
 			exit(1);
 			break;
 		case 0:
-			processCommandLine(currCommand, smallshPID);
+			processCommandLine(currCommand, smallshPID, killCount);
 			exit(0);
 		default:
+			//if (currCommand->backgroundValue == 0)
 			childPid = wait(&childStatus);
-			if (strcmp(currCommand->command, "pwd\n") == 0) {
-				printf("\n");
-				fflush(stdout);
+
+			// Changes the CATCH_VAR depending if its the first or second time, to make it 
+			// seem like the foreground-only mode is opening and closing
+			if (strcmp(currCommand->command, "kill") == 0 && killCount % 2 != 0) {
+				CATCH_VAR = 1;
+				killCount++;
+			}
+			if (strcmp(currCommand->command, "kill") == 0 && killCount % 2 == 0) {
+				CATCH_VAR = 0;
+				killCount++;
 			}
 			break;
 		}
 	}
 
+	// After all processes have been completed and the currCommand->command is now "exit"
 	exitCommand();
 
 	return EXIT_SUCCESS;
