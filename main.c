@@ -185,7 +185,7 @@ struct command* fillCommand(pid_t smallshPID) {
 // ================================================================================================
 /*
 void processCommandLine
-Takes the current command struct and processes it corresponding to whats been filled in the 
+Takes the current command struct and processes it corresponding to whats been filled in the
 fillCommand function
 Parameters: struct command* currCommand, int smallshPID, int killCount
 Returns: ---
@@ -351,7 +351,7 @@ void processCommandLine(struct command* currCommand, int smallshPID, int killCou
 			execvp(newargv[0], newargv);
 		}
 		// Foreground-only mode not on
-		else { 
+		else {
 			// Gets rid of the new line character in the parameters so it can execute
 			strtok(currCommand->parameters, "\n");
 			// Checks to see if its a background command
@@ -461,7 +461,7 @@ void processCommandLine(struct command* currCommand, int smallshPID, int killCou
 	// CATCH --------------------------------------------------------------------------------------
 	else {
 		/* This happens only if there is a command asked for that has not been implemented
-		 Also to catch any children that made it all the way down here to stop them in case of an 
+		 Also to catch any children that made it all the way down here to stop them in case of an
 		error occuring
 		*/
 		printf("CURR CMD |%s|\n", currCommand->command);
@@ -489,13 +489,35 @@ void sigtstpHandler(int signal) {
 }
 // ================================================================================================
 /*
-void processCommandLine
+void sigintCatcher
+Ignores the SIGINT signal
+Parameters: int sig
+Returns: ---
+*/
+void sigintCatcher(int sig) {
+	// Catches the signal of |Ctrl + C| and ignores it
+	(void)signal(SIGINT, SIG_DFL);
+}
+// ================================================================================================
+/*
+void sigtstpCatcher
+Ignores the SIGTSTP signal
+Parameters: int sig
+Returns: ---
+*/
+void sigtstpCatcher(int sig) {
+	// Catches the signal of |Ctrl + V| and ignores it 
+	(void)signal(SIGINT, SIG_DFL);
+}
+// ================================================================================================
+/*
+void exitCommand
 ---
 Parameters: ---
 Returns: ---
 */
 void exitCommand() {
-	printf("exit program\n\n");
+	printf("exit program");
 	fflush(stdout);
 }
 // ================================================================================================
@@ -565,6 +587,10 @@ int main() {
 	while (strcmp(currCommand->commandLine, "exit") - NEW_LINE_CHAR_VALUE != 0) {
 		// Fill out the command struct with the correct values of the current line
 		currCommand = fillCommand(smallshPID);
+
+		// These catch the |Ctrl + C (SIGINT)| and |Ctrl + V (SIGTSTP)| signals
+		(void)signal(SIGINT, sigintCatcher);
+		(void)signal(SIGTSTP, sigtstpCatcher);
 
 		// Activates CD if needed
 		cdCommand(currCommand);
