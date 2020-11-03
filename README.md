@@ -1,4 +1,4 @@
-# CS344-OSI---Assignment-3-Small-Shell
+# CS344 - OS I - Assignment 3 Small-Shell
 # Introduction
 In this assignment you will write smallsh your own shell in C. smallsh will implement a subset of features of well-known shells, such as bash. Your program will:
 
