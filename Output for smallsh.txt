@@ -1,0 +1,187 @@
+os1 ~/vsprojects/smallsh 1057$ gcc --std=gnu99 main.c -o smallsh
+os1 ~/vsprojects/smallsh 1058$ ./p3testscript
+
+PRE-SCRIPT INFO
+  Grading Script PID: 103054
+  Note: your smallsh will report a different PID when evaluating $$
+: BEGINNING TEST SCRIPT
+:
+: --------------------
+: Using comment (5 points if only next prompt is displayed next)
+: :
+:
+: --------------------
+: ls (10 points for returning dir contents)
+: a.out  ~AutoRecover.smallsh.vcxproj  Debug  junk  junk2  main.c  oops  oops2  p3testscript  smallsh  smallsh.sln  smallsh.vcxproj  smallsh.vcxproj.filters  smallsh.vcxproj.user
+:
+:
+: --------------------
+: ls out junk
+: :
+:
+: --------------------
+: cat junk (15 points for correctly returning contents of junk)
+: a.out
+~AutoRecover.smallsh.vcxproj
+Debug
+junk
+junk2
+main.c
+oops
+oops2
+p3testscript
+smallsh
+smallsh.sln
+smallsh.vcxproj
+smallsh.vcxproj.filters
+smallsh.vcxproj.user
+:
+:
+: --------------------
+: wc in junk (15 points for returning correct numbers from wc)
+:  14  14 164 junk
+:
+:
+: --------------------
+: wc in junk out junk2; cat junk2 (10 points for returning correct numbers from wc)
+: :  14  14 164 junk
+:
+:
+: --------------------
+: test -f badfile (10 points for returning error value of 1, note extraneous &)
+: : Exit value |1|
+:
+:
+: --------------------
+: wc in badfile (10 points for returning text error)
+: /bin/wc: badfile: No such file or directory
+:
+:
+: --------------------
+: badfile (10 points for returning text error)
+: badfile: : No such file or directory
+:
+:
+: --------------------
+: sleep 100 background (10 points for returning process ID of sleeper)
+: Background PID is |103116|
+:
+:
+: --------------------
+: pkill -signal SIGTERM sleep (10 points for pid of killed process, 10 points for signal)
+: (Ignore message about Operation Not Permitted)
+: pkill: killing pid 5459 failed: Operation not permitted
+pkill: killing pid 6659 failed: Operation not permitted
+pkill: killing pid 9772 failed: Operation not permitted
+pkill: killing pid 9773 failed: Operation not permitted
+pkill: killing pid 17837 failed: Operation not permitted
+pkill: killing pid 17848 failed: Operation not permitted
+pkill: killing pid 17849 failed: Operation not permitted
+pkill: killing pid 24014 failed: Operation not permitted
+pkill: killing pid 24015 failed: Operation not permitted
+pkill: killing pid 49042 failed: Operation not permitted
+pkill: killing pid 49043 failed: Operation not permitted
+pkill: killing pid 52259 failed: Operation not permitted
+pkill: killing pid 52270 failed: Operation not permitted
+pkill: killing pid 52272 failed: Operation not permitted
+pkill: killing pid 61980 failed: Operation not permitted
+pkill: killing pid 62991 failed: Operation not permitted
+pkill: killing pid 72499 failed: Operation not permitted
+pkill: killing pid 72707 failed: Operation not permitted
+pkill: killing pid 73876 failed: Operation not permitted
+pkill: killing pid 74002 failed: Operation not permitted
+pkill: killing pid 76680 failed: Operation not permitted
+pkill: killing pid 77851 failed: Operation not permitted
+pkill: killing pid 78748 failed: Operation not permitted
+pkill: killing pid 79680 failed: Operation not permitted
+pkill: killing pid 80085 failed: Operation not permitted
+pkill: killing pid 80157 failed: Operation not permitted
+pkill: killing pid 80536 failed: Operation not permitted
+pkill: killing pid 82160 failed: Operation not permitted
+pkill: killing pid 82161 failed: Operation not permitted
+pkill: killing pid 82509 failed: Operation not permitted
+pkill: killing pid 83403 failed: Operation not permitted
+pkill: killing pid 84406 failed: Operation not permitted
+pkill: killing pid 86946 failed: Operation not permitted
+pkill: killing pid 86952 failed: Operation not permitted
+pkill: killing pid 90012 failed: Operation not permitted
+pkill: killing pid 91049 failed: Operation not permitted
+pkill: killing pid 92213 failed: Operation not permitted
+pkill: killing pid 93107 failed: Operation not permitted
+pkill: killing pid 95090 failed: Operation not permitted
+pkill: killing pid 95940 failed: Operation not permitted
+pkill: killing pid 96011 failed: Operation not permitted
+pkill: killing pid 96857 failed: Operation not permitted
+pkill: killing pid 100201 failed: Operation not permitted
+pkill: killing pid 101078 failed: Operation not permitted
+pkill: killing pid 101892 failed: Operation not permitted
+pkill: killing pid 101931 failed: Operation not permitted
+pkill: killing pid 102276 failed: Operation not permitted
+pkill: killing pid 102559 failed: Operation not permitted
+pkill: killing pid 103002 failed: Operation not permitted
+pkill: killing pid 103004 failed: Operation not permitted
+pkill: killing pid 147317 failed: Operation not permitted
+pkill: killing pid 147318 failed: Operation not permitted
+pkill: killing pid 154149 failed: Operation not permitted
+pkill: killing pid 189909 failed: Operation not permitted
+pkill: killing pid 199825 failed: Operation not permitted
+pkill: killing pid 199899 failed: Operation not permitted
+pkill: killing pid 199900 failed: Operation not permitted
+pkill: killing pid 206066 failed: Operation not permitted
+pkill: killing pid 206106 failed: Operation not permitted
+pkill: killing pid 210088 failed: Operation not permitted
+pkill: killing pid 217975 failed: Operation not permitted
+pkill: killing pid 217986 failed: Operation not permitted
+pkill: killing pid 217987 failed: Operation not permitted
+pkill: killing pid 258769 failed: Operation not permitted
+pkill: killing pid 263224 failed: Operation not permitted
+pkill: killing pid 269360 failed: Operation not permitted
+pkill: killing pid 269835 failed: Operation not permitted
+pkill: killing pid 276433 failed: Operation not permitted
+pkill: killing pid 276465 failed: Operation not permitted
+pkill: killing pid 282236 failed: Operation not permitted
+pkill: killing pid 282296 failed: Operation not permitted
+pkill: killing pid 303393 failed: Operation not permitted
+pkill: killing pid 322450 failed: Operation not permitted
+:
+:
+: --------------------
+: sleep 1 background (10 pts for pid of bg ps when done, 10 for exit value)
+: Background PID is |103199|
+: :
+:
+: --------------------
+: pwd
+: /nfs/stak/users/bellj3/vsprojects/smallsh
+:
+:
+: --------------------
+: cd
+: :
+:
+: --------------------
+: pwd (10 points for being in the HOME dir)
+: /nfs/stak/users/bellj3
+:
+:
+: --------------------
+: mkdir testdir103054
+:
+:
+:
+: --------------------
+: cd testdir103054
+: :
+:
+: --------------------
+: pwd (5 points for being in the newly created dir)
+: /nfs/stak/users/bellj3/testdir103054
+: --------------------
+: Testing foreground-only mode (20 points for entry & exit text AND ~5 seconds between times)
+: Entering foreground-only mode (& is now ignored)
+: Tue Nov  3 18:16:26 PST 2020
+: : Tue Nov  3 18:16:31 PST 2020
+: Exiting foreground-only mode
+:
+
+Exit program
