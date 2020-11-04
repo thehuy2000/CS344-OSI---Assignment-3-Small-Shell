@@ -20,6 +20,7 @@ int MAX_CHAR = 2048; // Max number of chars in a command line
 int MAX_CMD = 512; // Max number of commands 
 int NEW_LINE_CHAR_VALUE = 10; // "\n" ASCII Value
 int CATCH_VAR = 0; // For catching SIGTSTP
+int BG_ARRAY_PLACEMENT = 0; // Keeps track of the pid_t placements in the array
 
 // ================================================================================================
 /*
@@ -43,7 +44,7 @@ struct command {
 // Headers ========================================================================================
 char* getCommandLine();
 struct command* fillCommand(pid_t smallshPID);
-void processCommandLine(struct command* currCommand, int smallshPID, int killCount);
+void processCommandLine(struct command* currCommand, int smallshPID, int killCount, pid_t backgroundIdArray[]);
 void sigtstpHandler(int signal);
 void cdCommand(struct command* currCommand);
 void statusCommand(int stat);
@@ -190,7 +191,7 @@ fillCommand function
 Parameters: struct command* currCommand, int smallshPID, int killCount
 Returns: ---
 */
-void processCommandLine(struct command* currCommand, int smallshPID, int killCount) {
+void processCommandLine(struct command* currCommand, int smallshPID, int killCount, pid_t backgroundIdArray[]) {
 	// Initialize a temp char 
 	char* temp = calloc(MAX_CHAR + 1, sizeof(char));
 	pid_t spawnpidsleep = -5;
@@ -361,6 +362,8 @@ void processCommandLine(struct command* currCommand, int smallshPID, int killCou
 
 				// Initializes forking values
 				pid_t ogPID;
+				int backgroundStatus = 0;
+				int bgStat = 0;
 				ogPID = getpid();
 
 				// Forks and because its in the background it doesnt wait for it to end
@@ -371,6 +374,13 @@ void processCommandLine(struct command* currCommand, int smallshPID, int killCou
 				if (bPID - ogPID == 1) {
 					printf("Background PID is |%d|\n", bPID);
 					fflush(stdout);
+
+					// Stores the background process id in the global array for the pid_t's and increment the arrays placement so it doesnt override any other background process id's
+					backgroundIdArray[BG_ARRAY_PLACEMENT] == bPID;
+					BG_ARRAY_PLACEMENT++;
+
+
+
 					char* newargv[] = { "/bin/sleep", currCommand->parameters, NULL };
 					execvp(newargv[0], newargv);
 				}
@@ -442,7 +452,7 @@ void processCommandLine(struct command* currCommand, int smallshPID, int killCou
 				exit(1);
 			}
 
-			// If killCount is even that means that foregroung-only mode is off, so turn it on
+			// If killCount is even that means that foreground-only mode is off, so turn it on
 			if (killCount % 2 == 0)
 				CATCH_VAR = 1;
 
@@ -512,12 +522,12 @@ void sigtstpCatcher(int sig) {
 // ================================================================================================
 /*
 void exitCommand
----
+Prints that you are exiting the program
 Parameters: ---
 Returns: ---
 */
 void exitCommand() {
-	printf("exit program");
+	printf("\nExit program\n");
 	fflush(stdout);
 }
 // ================================================================================================
@@ -576,11 +586,16 @@ int main() {
 	char* smallshDIR = calloc(MAX_CHAR + 1, sizeof(char));
 	strcpy(smallshDIR, getcwd(buffer, MAX_CHAR));
 
+	// Keeps track of the background process id 
+	pid_t backgroundIdArray[512];
+
 	// Initializes forking variables and other vriables
 	pid_t smallshPID = getppid();
 	pid_t spawnpid = -5;
-	int childStatus = 0;
 	int childPid = 0;
+	int childStatus = 0;
+	int backPid = 0;
+	int backStatus = 0;
 	int stat = 0;
 	int killCount = 0; // If its 1 then we ignore "&" if its 0 we take "&" into account
 
@@ -595,6 +610,7 @@ int main() {
 		// Activates CD if needed
 		cdCommand(currCommand);
 
+		// Activates the status command if the command is "status"
 		if (strcmp(currCommand->command, "status") == 0) {
 			statusCommand(childStatus);
 		}
@@ -607,11 +623,19 @@ int main() {
 			exit(1);
 			break;
 		case 0:
-			processCommandLine(currCommand, smallshPID, killCount);
+			processCommandLine(currCommand, smallshPID, killCount, backgroundIdArray);
 			exit(0);
 		default:
-			//if (currCommand->backgroundValue == 0)
+			// Waits for a child to be complete if its in the foreground
 			childPid = wait(&childStatus);
+
+			// Checks to see if a background process is terminated --- Does not work
+			//backPid = waitpid(backgroundIdArray[BG_ARRAY_PLACEMENT], &backStatus, WNOHANG);
+			//if (backPid != 0) {
+			//	printf("Background Process |%d| ended with ", backPid);
+			//	fflush(stdout);
+			//	statusCommand(backPid);
+			//}
 
 			// Changes the CATCH_VAR depending if its the first or second time, to make it 
 			// seem like the foreground-only mode is opening and closing
